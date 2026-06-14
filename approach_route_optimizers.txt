@@ -1,0 +1,97 @@
+TRAFFIC DEMAND PREDICTION — APPROACH SUMMARY
+Gridlock Hackathon 2.0 | Flipkart
+============================================
+
+
+FINAL SCORE: 95.37 / 100
+
+
+--------------------------------------------
+ACCURACY IMPROVEMENT
+--------------------------------------------
+
+Baseline  : CatBoost only (128 iterations) — Score: 83.24
+Our Model : LGB + XGB + CatBoost Ensemble  — Score: 95.37
+Improvement: +12.13 points
+
+
+--------------------------------------------
+TOOLS & LIBRARIES USED
+--------------------------------------------
+
+- LightGBM
+- XGBoost
+- CatBoost
+- scikit-learn (KFold, r2_score)
+- pandas
+- NumPy
+
+
+--------------------------------------------
+FEATURE ENGINEERING
+--------------------------------------------
+
+1. Cyclic Time Encoding
+   - hour_sin, hour_cos, minute_sin, minute_cos, time_sin, time_cos
+   - Captures exact 15-minute interval, not just the hour
+
+2. Geohash Target Encoding (Biggest Gain)
+   - Each geohash replaced by mean demand of that location
+   - Computed inside each CV fold to prevent data leakage
+   - Prefix levels: geo3, geo4, geo5 for multi-scale location info
+
+3. Ordinal Encoding
+   - RoadType  : Residential=0, Street=1, Highway=2
+   - Weather   : Snowy=0, Rainy=1, Foggy=2, Sunny=3
+
+4. Interaction Features
+   - lanes_x_road      = NumberofLanes x RoadType_ord
+   - lanes_x_vehicles  = NumberofLanes x LargeVehicles_bin
+   - temp_x_weather    = Temperature x Weather_ord
+   - road_x_landmark   = RoadType_ord x Landmarks_bin
+
+5. Peak Hour Flags
+   - is_morning_peak : 7am - 9am
+   - is_evening_peak : 5pm - 7pm
+   - is_night        : 10pm - 5am
+
+6. Smart Missing Value Imputation
+   - Temperature filled by per-weather-group median
+   - Example: Snowy days filled with median temp of all Snowy records
+
+
+--------------------------------------------
+MODEL ARCHITECTURE
+--------------------------------------------
+
+- 3 models: LightGBM + XGBoost + CatBoost
+- 5-Fold Cross Validation (KFold, shuffle=True, random_state=42)
+- Up to 3000 trees per model with early stopping at 150 rounds
+
+LightGBM  : num_leaves=127, feature_fraction=0.8, bagging_fraction=0.8
+XGBoost   : max_depth=7, subsample=0.8, colsample_bytree=0.8, tree_method=hist
+CatBoost  : depth=8, l2_leaf_reg=3, loss_function=RMSE
+
+Final Prediction = w1 x LGB + w2 x XGB + w3 x CatBoost
+Weights auto-optimized via OOF grid search in steps of 0.05
+
+
+--------------------------------------------
+VALIDATION STRATEGY
+--------------------------------------------
+
+- 5-Fold CV uses 100% of training data
+- Target encoding done inside each fold (zero data leakage)
+- Test predictions averaged across all 5 folds
+- Best blend weights selected by OOF R² score
+
+
+--------------------------------------------
+SUBMISSION DETAILS
+--------------------------------------------
+
+- File: submission_route_optimizers.csv
+- Shape: 41,778 rows x 2 columns (Index, demand)
+- Demand range: [0.0, 1.0] — all predictions valid
+- No null values
+- Final Score: 95.37 / 100
